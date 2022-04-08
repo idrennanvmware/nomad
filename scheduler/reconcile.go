@@ -344,12 +344,13 @@ func (a *allocReconciler) handleStop(m allocMatrix) {
 // filterAndStopAll stops all allocations in an allocSet. This is useful in when
 // stopping an entire job or task group.
 func (a *allocReconciler) filterAndStopAll(set allocSet) uint64 {
-	untainted, migrate, lost, disconnecting, reconnecting, _ := set.filterByTainted(a.taintedNodes, a.supportsDisconnectedClients, a.now)
+	untainted, migrate, lost, disconnecting, reconnecting, ignore := set.filterByTainted(a.taintedNodes, a.supportsDisconnectedClients, a.now, a.logger)
 	a.markStop(untainted, "", allocNotNeeded)
 	a.markStop(migrate, "", allocNotNeeded)
 	a.markStop(lost, structs.AllocClientStatusLost, allocLost)
 	a.markStop(disconnecting, "", allocNotNeeded)
 	a.markStop(reconnecting, "", allocNotNeeded)
+	a.markStop(ignore, "", allocNotNeeded)
 	return uint64(len(set))
 }
 
@@ -403,11 +404,18 @@ func (a *allocReconciler) computeGroup(groupName string, all allocSet) bool {
 	all, ignore := a.filterOldTerminalAllocs(all)
 	desiredChanges.Ignore += uint64(len(ignore))
 
-	canaries, all := a.cancelUnneededCanaries(all, desiredChanges)
+	canaries, all, disconnectingCanaries := a.cancelUnneededCanaries(all, desiredChanges)
 
 	// Determine what set of allocations are on tainted nodes
-	untainted, migrate, lost, disconnecting, reconnecting, ignore := all.filterByTainted(a.taintedNodes, a.supportsDisconnectedClients, a.now)
+	untainted, migrate, lost, disconnecting, reconnecting, ignore := all.filterByTainted(a.taintedNodes, a.supportsDisconnectedClients, a.now, a.logger)
 	desiredChanges.Ignore += uint64(len(ignore))
+	untainted.log("computeGroup untainted", a.logger)
+	migrate.log("computeGroup migrate", a.logger)
+	lost.log("computeGroup lost", a.logger)
+	disconnecting = disconnecting.difference(disconnectingCanaries)
+	disconnecting.log("computeGroup disconnecting", a.logger)
+	reconnecting.log("computeGroup reconnecting", a.logger)
+	ignore.log("computeGroup ignore", a.logger)
 
 	// Determine what set of terminal allocations need to be rescheduled
 	untainted, rescheduleNow, rescheduleLater := untainted.filterByRescheduleable(a.batch, false, a.now, a.evalID, a.deployment)
@@ -578,7 +586,7 @@ func (a *allocReconciler) filterOldTerminalAllocs(all allocSet) (filtered, ignor
 // cancelUnneededCanaries handles the canaries for the group by stopping the
 // unneeded ones and returning the current set of canaries and the updated total
 // set of allocs for the group
-func (a *allocReconciler) cancelUnneededCanaries(original allocSet, desiredChanges *structs.DesiredUpdates) (canaries, all allocSet) {
+func (a *allocReconciler) cancelUnneededCanaries(original allocSet, desiredChanges *structs.DesiredUpdates) (canaries, all, disconnecting allocSet) {
 	// Stop any canary from an older deployment or from a failed one
 	var stop []string
 
@@ -618,12 +626,26 @@ func (a *allocReconciler) cancelUnneededCanaries(original allocSet, desiredChang
 		}
 
 		canaries = all.fromKeys(canaryIDs)
-		untainted, migrate, lost, _, _, _ := canaries.filterByTainted(a.taintedNodes, a.supportsDisconnectedClients, a.now)
+		untainted, migrate, lost, disconnecting := canaries.filterCanaries(a.taintedNodes, a.supportsDisconnectedClients)
+
+		untainted.log("cancelUnneededCanaries untainted", a.logger)
+		migrate.log("cancelUnneededCanaries migrate", a.logger)
+		lost.log("cancelUnneededCanaries lost", a.logger)
+		disconnecting.log("cancelUnneededCanaries disconnecting", a.logger)
+
 		a.markStop(migrate, "", allocMigrating)
 		a.markStop(lost, structs.AllocClientStatusLost, allocLost)
 
+		// Disconnecting canaries need to be marked stop and unknown.
+		for _, alloc := range disconnecting {
+			alloc.ClientStatus = structs.AllocClientStatusUnknown
+			alloc.ClientDescription = allocUnknown
+			alloc.DesiredStatus = structs.AllocDesiredStatusStop
+			a.result.disconnectUpdates[alloc.ID] = alloc
+		}
+
 		canaries = untainted
-		all = all.difference(migrate, lost)
+		all = all.difference(migrate, lost, disconnecting)
 	}
 
 	return
@@ -1263,6 +1285,8 @@ func (a *allocReconciler) createTimeoutLaterEvals(disconnecting allocSet, tgName
 		return map[string]string{}
 	}
 
+	a.logger.Trace("createTimeoutLaterEvals", "disconnecting", len(disconnecting))
+
 	timeoutDelays, err := disconnecting.delayByMaxClientDisconnect(a.now)
 	if err != nil || len(timeoutDelays) != len(disconnecting) {
 		a.logger.Error("error computing disconnecting timeouts for task_group", "task_group", tgName, "err", err)
@@ -1343,6 +1367,7 @@ func (a *allocReconciler) appendFollowupEvals(tgName string, evals []*structs.Ev
 		evals = append(existingFollowUpEvals, evals...)
 	}
 
+	a.logger.Trace("appendFollowUpEvals", "follow_up_evals", len(evals))
 	a.result.desiredFollowupEvals[tgName] = evals
 }
 
