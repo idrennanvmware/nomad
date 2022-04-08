@@ -411,6 +411,16 @@ func (a allocSet) filterCanaries(nodes map[string]*structs.Node, supportDisconne
 			continue
 		}
 
+		// Canaries on disconnected nodes are disconnecting so that they can be
+		// marked stop and unknown.
+		if supportDisconnectedClients &&
+			nodeIsTainted &&
+			node.Status == structs.NodeStatusDisconnected &&
+			alloc.DesiredStatus != structs.AllocDesiredStatusStop {
+			disconnecting[alloc.ID] = alloc
+			continue
+		}
+
 		// Terminal allocs are always untainted as they should never be migrated
 		if alloc.TerminalStatus() {
 			untainted[alloc.ID] = alloc

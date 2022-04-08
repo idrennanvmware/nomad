@@ -626,11 +626,12 @@ func (a *allocReconciler) cancelUnneededCanaries(original allocSet, desiredChang
 		}
 
 		canaries = all.fromKeys(canaryIDs)
-		untainted, migrate, lost, disconnecting := canaries.filterCanaries(a.taintedNodes, a.supportsDisconnectedClients)
+		untainted, migrate, lost, disconnectingCanaries := canaries.filterCanaries(a.taintedNodes, a.supportsDisconnectedClients)
 
 		untainted.log("cancelUnneededCanaries untainted", a.logger)
 		migrate.log("cancelUnneededCanaries migrate", a.logger)
 		lost.log("cancelUnneededCanaries lost", a.logger)
+		disconnecting = disconnectingCanaries
 		disconnecting.log("cancelUnneededCanaries disconnecting", a.logger)
 
 		a.markStop(migrate, "", allocMigrating)
