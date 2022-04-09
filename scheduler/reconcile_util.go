@@ -272,7 +272,8 @@ func (a allocSet) filterByTainted(taintedNodes map[string]*structs.Node, support
 			switch taintedNode.Status {
 			case structs.NodeStatusDisconnected:
 				// Filter running allocs on a node that is disconnected to be marked as unknown.
-				if alloc.ClientStatus == structs.AllocClientStatusRunning {
+				if alloc.DesiredStatus == structs.AllocDesiredStatusRun &&
+					alloc.ClientStatus == structs.AllocClientStatusRunning {
 					disconnecting[alloc.ID] = alloc
 					continue
 				}
@@ -299,7 +300,6 @@ func (a allocSet) filterByTainted(taintedNodes map[string]*structs.Node, support
 		// should never be migrated.
 		if alloc.TerminalStatus() && !reconnected {
 			untainted[alloc.ID] = alloc
-			logAlloc(alloc, "filterByTainted 302", logger)
 			continue
 		}
 
@@ -345,37 +345,8 @@ func (a allocSet) filterByTainted(taintedNodes map[string]*structs.Node, support
 
 			// Otherwise, Node is untainted so alloc is untainted
 			untainted[alloc.ID] = alloc
-			logAlloc(alloc, "filterByTainted 348", logger)
 			continue
 		}
-
-		//if taintedNode != nil && supportsDisconnectedClients {
-		//	// Group disconnecting/reconnecting
-		//	switch taintedNode.Status {
-		//	case structs.NodeStatusDisconnected:
-		//		// Filter running allocs on a node that is disconnected to be marked as unknown.
-		//		if alloc.ClientStatus == structs.AllocClientStatusRunning {
-		//			disconnecting[alloc.ID] = alloc
-		//			continue
-		//		}
-		//		// Filter pending allocs on a node that is disconnected to be marked as lost.
-		//		if alloc.ClientStatus == structs.AllocClientStatusPending {
-		//			lost[alloc.ID] = alloc
-		//			continue
-		//		}
-		//	case structs.NodeStatusReady:
-		//		// Filter reconnecting allocs with replacements on a node that is now connected.
-		//		if reconnected {
-		//			if expired {
-		//				lost[alloc.ID] = alloc
-		//				continue
-		//			}
-		//			reconnecting[alloc.ID] = alloc
-		//			continue
-		//		}
-		//	default:
-		//	}
-		//}
 
 		// Allocs on GC'd (nil) or lost nodes are Lost
 		if taintedNode == nil || taintedNode.TerminalStatus() {
@@ -385,7 +356,6 @@ func (a allocSet) filterByTainted(taintedNodes map[string]*structs.Node, support
 
 		// All other allocs are untainted
 		untainted[alloc.ID] = alloc
-		fmt.Println("filterByTainted 355")
 	}
 
 	return

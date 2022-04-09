@@ -412,6 +412,16 @@ func (s *GenericScheduler) computeJobAllocs() error {
 
 	// Handle disconnect updates
 	for _, update := range results.disconnectUpdates {
+		s.logger.Trace("disconnect_updates",
+			"node_name", update.NodeName,
+			"alloc_id", update.ID,
+			"alloc_modify_index", update.AllocModifyIndex,
+			"client_status", update.ClientStatus,
+			"desired_status", update.DesiredStatus,
+			"should_migrate", update.DesiredTransition.ShouldMigrate(),
+			"should_reschedule", update.DesiredTransition.ShouldReschedule(),
+			"ignore_shutdown_delay", update.DesiredTransition.ShouldIgnoreShutdownDelay(),
+			"force_reschedule", update.DesiredTransition.ShouldForceReschedule())
 		s.plan.AppendUnknownAlloc(update)
 	}
 

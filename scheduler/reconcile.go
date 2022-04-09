@@ -409,13 +409,14 @@ func (a *allocReconciler) computeGroup(groupName string, all allocSet) bool {
 	// Determine what set of allocations are on tainted nodes
 	untainted, migrate, lost, disconnecting, reconnecting, ignore := all.filterByTainted(a.taintedNodes, a.supportsDisconnectedClients, a.now, a.logger)
 	desiredChanges.Ignore += uint64(len(ignore))
-	untainted.log("computeGroup untainted", a.logger)
-	migrate.log("computeGroup migrate", a.logger)
-	lost.log("computeGroup lost", a.logger)
 	disconnecting = disconnecting.difference(disconnectingCanaries)
-	disconnecting.log("computeGroup disconnecting", a.logger)
-	reconnecting.log("computeGroup reconnecting", a.logger)
-	ignore.log("computeGroup ignore", a.logger)
+
+	//untainted.log("computeGroup untainted", a.logger)
+	//migrate.log("computeGroup migrate", a.logger)
+	//lost.log("computeGroup lost", a.logger)
+	// disconnecting.log("computeGroup disconnecting", a.logger)
+	//reconnecting.log("computeGroup reconnecting", a.logger)
+	//ignore.log("computeGroup ignore", a.logger)
 
 	// Determine what set of terminal allocations need to be rescheduled
 	untainted, rescheduleNow, rescheduleLater := untainted.filterByRescheduleable(a.batch, false, a.now, a.evalID, a.deployment)
