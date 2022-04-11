@@ -376,17 +376,8 @@ func (a allocSet) filterCanaries(nodes map[string]*structs.Node, supportDisconne
 		if supportDisconnectedClients &&
 			nodeIsTainted &&
 			node.Status == structs.NodeStatusDisconnected &&
-			alloc.DesiredStatus != structs.AllocDesiredStatusStop {
-			disconnecting[alloc.ID] = alloc
-			continue
-		}
-
-		// Canaries on disconnected nodes are disconnecting so that they can be
-		// marked stop and unknown.
-		if supportDisconnectedClients &&
-			nodeIsTainted &&
-			node.Status == structs.NodeStatusDisconnected &&
-			alloc.DesiredStatus != structs.AllocDesiredStatusStop {
+			(alloc.ClientStatus == structs.AllocClientStatusPending || alloc.ClientStatus == structs.AllocClientStatusRunning) &&
+			alloc.DesiredStatus == structs.AllocDesiredStatusRun {
 			disconnecting[alloc.ID] = alloc
 			continue
 		}
@@ -432,6 +423,12 @@ func (a allocSet) filterByRescheduleable(isBatch, isDisconnecting bool, now time
 	// When filtering disconnected sets, the untainted set is never populated.
 	// It has no purpose in that context.
 	for _, alloc := range a {
+		// Ignore disconnecting allocs that are already unknown. This can happen
+		// in the case of canaries that are interrupted by a disconnect.
+		if isDisconnecting && alloc.ClientStatus == structs.AllocClientStatusUnknown {
+			continue
+		}
+
 		var eligibleNow, eligibleLater bool
 		var rescheduleTime time.Time
 

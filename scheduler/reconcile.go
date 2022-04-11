@@ -411,13 +411,6 @@ func (a *allocReconciler) computeGroup(groupName string, all allocSet) bool {
 	desiredChanges.Ignore += uint64(len(ignore))
 	disconnecting = disconnecting.difference(disconnectingCanaries)
 
-	//untainted.log("computeGroup untainted", a.logger)
-	//migrate.log("computeGroup migrate", a.logger)
-	//lost.log("computeGroup lost", a.logger)
-	// disconnecting.log("computeGroup disconnecting", a.logger)
-	//reconnecting.log("computeGroup reconnecting", a.logger)
-	//ignore.log("computeGroup ignore", a.logger)
-
 	// Determine what set of terminal allocations need to be rescheduled
 	untainted, rescheduleNow, rescheduleLater := untainted.filterByRescheduleable(a.batch, false, a.now, a.evalID, a.deployment)
 
