@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/nomad/nomad/structs"
 )
 
@@ -209,25 +208,6 @@ func (a allocSet) fromKeys(keys ...[]string) allocSet {
 	return from
 }
 
-func (a allocSet) log(msg string, logger hclog.Logger) {
-	for _, alloc := range a {
-		logAlloc(alloc, msg, logger)
-	}
-}
-
-func logAlloc(alloc *structs.Allocation, msg string, logger hclog.Logger) {
-	logger.Trace("allocSet.log "+msg,
-		"node_name", alloc.NodeName,
-		"alloc_id", alloc.ID,
-		"alloc_modify_index", alloc.AllocModifyIndex,
-		"client_status", alloc.ClientStatus,
-		"desired_status", alloc.DesiredStatus,
-		"should_migrate", alloc.DesiredTransition.ShouldMigrate(),
-		"should_reschedule", alloc.DesiredTransition.ShouldReschedule(),
-		"ignore_shutdown_delay", alloc.DesiredTransition.ShouldIgnoreShutdownDelay(),
-		"force_reschedule", alloc.DesiredTransition.ShouldForceReschedule())
-}
-
 // filterByTainted takes a set of tainted nodes and filters the allocation set
 // into the following groups:
 // 1. Those that exist on untainted nodes
@@ -236,7 +216,7 @@ func logAlloc(alloc *structs.Allocation, msg string, logger hclog.Logger) {
 // 4. Those that are on nodes that are disconnected, but have not had their ClientState set to unknown
 // 5. Those that are on a node that has reconnected.
 // 6. Those that are in a state that results in a noop.
-func (a allocSet) filterByTainted(taintedNodes map[string]*structs.Node, supportsDisconnectedClients bool, now time.Time, logger hclog.Logger) (untainted, migrate, lost, disconnecting, reconnecting, ignore allocSet) {
+func (a allocSet) filterByTainted(taintedNodes map[string]*structs.Node, supportsDisconnectedClients bool, now time.Time) (untainted, migrate, lost, disconnecting, reconnecting, ignore allocSet) {
 	untainted = make(map[string]*structs.Allocation)
 	migrate = make(map[string]*structs.Allocation)
 	lost = make(map[string]*structs.Allocation)

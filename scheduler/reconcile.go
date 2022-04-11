@@ -344,7 +344,7 @@ func (a *allocReconciler) handleStop(m allocMatrix) {
 // filterAndStopAll stops all allocations in an allocSet. This is useful in when
 // stopping an entire job or task group.
 func (a *allocReconciler) filterAndStopAll(set allocSet) uint64 {
-	untainted, migrate, lost, disconnecting, reconnecting, ignore := set.filterByTainted(a.taintedNodes, a.supportsDisconnectedClients, a.now, a.logger)
+	untainted, migrate, lost, disconnecting, reconnecting, ignore := set.filterByTainted(a.taintedNodes, a.supportsDisconnectedClients, a.now)
 	a.markStop(untainted, "", allocNotNeeded)
 	a.markStop(migrate, "", allocNotNeeded)
 	a.markStop(lost, structs.AllocClientStatusLost, allocLost)
@@ -407,7 +407,7 @@ func (a *allocReconciler) computeGroup(groupName string, all allocSet) bool {
 	canaries, all, disconnectingCanaries := a.cancelUnneededCanaries(all, desiredChanges)
 
 	// Determine what set of allocations are on tainted nodes
-	untainted, migrate, lost, disconnecting, reconnecting, ignore := all.filterByTainted(a.taintedNodes, a.supportsDisconnectedClients, a.now, a.logger)
+	untainted, migrate, lost, disconnecting, reconnecting, ignore := all.filterByTainted(a.taintedNodes, a.supportsDisconnectedClients, a.now)
 	desiredChanges.Ignore += uint64(len(ignore))
 	disconnecting = disconnecting.difference(disconnectingCanaries)
 
@@ -620,13 +620,8 @@ func (a *allocReconciler) cancelUnneededCanaries(original allocSet, desiredChang
 		}
 
 		canaries = all.fromKeys(canaryIDs)
-		untainted, migrate, lost, disconnectingCanaries := canaries.filterCanaries(a.taintedNodes, a.supportsDisconnectedClients)
-
-		untainted.log("cancelUnneededCanaries untainted", a.logger)
-		migrate.log("cancelUnneededCanaries migrate", a.logger)
-		lost.log("cancelUnneededCanaries lost", a.logger)
-		disconnecting = disconnectingCanaries
-		disconnecting.log("cancelUnneededCanaries disconnecting", a.logger)
+		var untainted, migrate, lost allocSet
+		untainted, migrate, lost, disconnecting = canaries.filterCanaries(a.taintedNodes, a.supportsDisconnectedClients)
 
 		a.markStop(migrate, "", allocMigrating)
 		a.markStop(lost, structs.AllocClientStatusLost, allocLost)
